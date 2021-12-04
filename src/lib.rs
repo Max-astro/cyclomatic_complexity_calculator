@@ -104,3 +104,33 @@ impl<'a> AST<'a> {
         }
     }
 }
+
+#[test]
+fn test1() {
+    use std::fs::File;
+    use std::io::prelude::*;
+
+    let file_dir = File::open("./testcase/t1.py").unwrap();
+    let mut src = String::new();
+    let mut reader = std::io::BufReader::new(file_dir);
+    let _ = reader.read_to_string(&mut src);
+
+    let ast = AST::new(&src);
+    let functions = ast.travers_ast();
+    println!("{:?}", functions);
+}
+
+#[test]
+fn test2() {
+    use std::fs::File;
+    use std::io::prelude::*;
+
+    let file_dir = File::open("./testcase/py_grammer.py").unwrap();
+    let mut src = String::new();
+    let mut reader = std::io::BufReader::new(file_dir);
+    let _ = reader.read_to_string(&mut src);
+
+    let ast = AST::new(&src);
+    let functions = ast.travers_ast();
+    println!("{:?}", functions);
+}
