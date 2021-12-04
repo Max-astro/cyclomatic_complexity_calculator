@@ -46,7 +46,7 @@ impl<'a> AST<'a> {
         AST { src, tree }
     }
 
-    fn travers_ast(&self) -> Vec<(String, usize)> {
+    pub fn travers_ast(&self) -> Vec<(String, usize)> {
         let mut res = vec![];
         let root = self.tree.root_node();
         for i in 0..root.child_count() {
@@ -97,6 +97,7 @@ impl<'a> AST<'a> {
         (full_name, cc)
     }
 
+    #[allow(dead_code)]
     fn dbg_ast(node: Node) {
         for i in 0..node.child_count() {
             let child = node.child(i).unwrap();
@@ -105,11 +106,33 @@ impl<'a> AST<'a> {
     }
 }
 
+use std::fs::File;
+use std::io::prelude::*;
+
+use pyo3::prelude::*;
+
+#[pyfunction]
+fn calc_cc(dir: String) -> Vec<(String, usize)> {
+    let file_dir = File::open(&dir).unwrap();
+    let mut src = String::new();
+    let mut reader = std::io::BufReader::new(file_dir);
+    let _ = reader.read_to_string(&mut src);
+
+    let ast = AST::new(&src);
+    ast.travers_ast()
+}
+
+#[pymodule]
+fn py_cyclo_complexity(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_function(wrap_pyfunction!(calc_cc, m)?)?;
+
+    Ok(())
+}
+
+/* Tests */
+
 #[test]
 fn test1() {
-    use std::fs::File;
-    use std::io::prelude::*;
-
     let file_dir = File::open("./testcase/t1.py").unwrap();
     let mut src = String::new();
     let mut reader = std::io::BufReader::new(file_dir);
@@ -122,9 +145,6 @@ fn test1() {
 
 #[test]
 fn test2() {
-    use std::fs::File;
-    use std::io::prelude::*;
-
     let file_dir = File::open("./testcase/py_grammer.py").unwrap();
     let mut src = String::new();
     let mut reader = std::io::BufReader::new(file_dir);
