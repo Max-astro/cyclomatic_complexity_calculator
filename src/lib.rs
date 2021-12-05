@@ -106,13 +106,76 @@ impl<'a> AST<'a> {
     }
 }
 
-use std::fs::File;
-use std::io::prelude::*;
+use std::collections::HashMap;
+use std::io::{BufReader, Read};
+use std::path::PathBuf;
+use walkdir::WalkDir;
+
+use std::sync::mpsc::channel;
+use threadpool::ThreadPool;
+
+type CcResult = Vec<(String, usize)>;
+pub struct FileCcCalculator(HashMap<String, CcResult>);
+
+impl FileCcCalculator {
+    fn single_file_cc(filepath: PathBuf) -> (String, CcResult) {
+        let mut src = String::new();
+        let mut reader = BufReader::new(File::open(&filepath).unwrap());
+        let _ = reader.read_to_string(&mut src);
+
+        let ast = AST::new(&src);
+        let cc = ast.travers_ast();
+        let file_name = filepath.to_str().map(|f| f.to_string()).unwrap();
+        (file_name, cc)
+    }
+
+    pub fn process_files(path: &str) -> Self {
+        let pool = ThreadPool::new(4);
+
+        let (tx, rx) = channel();
+
+        for entry in WalkDir::new(path)
+            .follow_links(true)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().unwrap_or_default() == "py")
+        {
+            let path = entry.path().to_owned();
+            let tx = tx.clone();
+            pool.execute(move || {
+                let cc = Self::single_file_cc(path);
+                tx.send(cc).expect("Could not send data!");
+            });
+        }
+
+        drop(tx); // manually close channel
+
+        let mut cc_results = HashMap::new();
+        for (file_name, result) in rx.iter() {
+            cc_results.insert(file_name, result);
+        }
+        Self(cc_results)
+    }
+
+    pub fn display(&self) -> String {
+        let mut string = String::new();
+        let FileCcCalculator(map) = self;
+        for (file, result) in map {
+            string.push_str(&format!("Functions in file \"{}\":\n", file));
+            for (function, cnt) in result {
+                string.push_str(&format!("  '{}' {}\n", function, cnt));
+            }
+            string.push('\n');
+        }
+        string
+    }
+}
 
 use pyo3::prelude::*;
+use std::fs::File;
 
 #[pyfunction]
-fn calc_cc(dir: String) -> Vec<(String, usize)> {
+fn calc_py_cc(dir: String) -> CcResult {
     let file_dir = File::open(&dir).unwrap();
     let mut src = String::new();
     let mut reader = std::io::BufReader::new(file_dir);
@@ -122,9 +185,23 @@ fn calc_cc(dir: String) -> Vec<(String, usize)> {
     ast.travers_ast()
 }
 
+#[pyfunction]
+fn calc_py_files_cc(dir: String) -> HashMap<String, CcResult> {
+    let FileCcCalculator(res) = FileCcCalculator::process_files(&dir);
+    res
+}
+
+#[pyfunction]
+fn show_py_files_cc(dir: String) -> String {
+    let string = FileCcCalculator::process_files(&dir).display();
+    string
+}
+
 #[pymodule]
 fn py_cyclo_complexity(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(calc_cc, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_py_cc, m)?)?;
+    m.add_function(wrap_pyfunction!(calc_py_files_cc, m)?)?;
+    m.add_function(wrap_pyfunction!(show_py_files_cc, m)?)?;
 
     Ok(())
 }
@@ -153,4 +230,10 @@ fn test2() {
     let ast = AST::new(&src);
     let functions = ast.travers_ast();
     println!("{:?}", functions);
+}
+
+#[test]
+fn multi_thread_test() {
+    let a = FileCcCalculator::process_files("./testcase/");
+    println!("{}", a.display());
 }

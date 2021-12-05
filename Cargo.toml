@@ -8,6 +8,9 @@ edition = "2018"
 [dependencies]
 tree-sitter="0.17"
 tree-sitter-python = "0.17"
+walkdir = "2.3.2"
+glob = "*"
+threadpool = "1.8.1"
 
 
 [lib]
