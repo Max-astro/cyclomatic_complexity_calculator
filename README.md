@@ -18,6 +18,6 @@ single_src_cc = py_cyclo_complexity.calc_py_cc("./testcase/t1.py")
 cc_dict = py_cyclo_complexity.calc_py_files_cc("./testcase/")
 
 # print the calculation results of all source files
-print(py_cyclo_complexity.show_py_files_cc("/Users/max/OneDrive/Codes/rust/cyclo_complexity/testcase/"))
+print(py_cyclo_complexity.show_py_files_cc("./testcase/"))
 
 ```
