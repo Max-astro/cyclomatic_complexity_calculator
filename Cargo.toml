@@ -1,5 +1,5 @@
 [package]
-name = "cyclo_complexity"
+name = "py_cyclo_complexity"
 version = "0.1.0"
 edition = "2018"
 
